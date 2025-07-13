@@ -51,4 +51,6 @@ resource "azurerm_mysql_flexible_server" "mysql_instance" {
 
   # Link to the private DNS zone
   private_dns_zone_id = azurerm_private_dns_zone.mysql_private_dns.id
+
+  depends_on = [azurerm_private_dns_zone_virtual_network_link.mysql_dns_link]
 }
