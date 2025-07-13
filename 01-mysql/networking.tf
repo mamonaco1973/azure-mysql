@@ -9,9 +9,9 @@ resource "azurerm_virtual_network" "project-vnet" {
 }
 
 # =================================================================================
-# DEFINE SUBNET FOR POSTGRESQL FLEXIBLE SERVER
+# DEFINE SUBNET FOR MYSQL FLEXIBLE SERVER
 # =================================================================================
-resource "azurerm_subnet" "postgres-subnet" {
+resource "azurerm_subnet" "mysql-subnet" {
   name                 = var.project_subnet                        # Subnet name (from variable)
   resource_group_name  = azurerm_resource_group.project_rg.name    # Must match VNet's RG
   virtual_network_name = azurerm_virtual_network.project-vnet.name # Link to parent VNet
@@ -28,33 +28,33 @@ resource "azurerm_subnet" "postgres-subnet" {
 }
 
 # =================================================================================
-# CREATE NETWORK SECURITY GROUP (NSG) FOR POSTGRESQL SUBNET
+# CREATE NETWORK SECURITY GROUP (NSG) FOR MYSQL SUBNET
 # =================================================================================
-resource "azurerm_network_security_group" "postgres-nsg" {
-  name                = "postgres-nsg"                         # NSG name
+resource "azurerm_network_security_group" "mysql-nsg" {
+  name                = "mysql-nsg"                         # NSG name
   location            = var.project_location                   # Region (from variable)
   resource_group_name = azurerm_resource_group.project_rg.name # Target RG
 
-  # Allow inbound PostgreSQL traffic (default port 5432)
+  # Allow inbound MySQL traffic (default port 3306)
   security_rule {
-    name                       = "Allow-Postgres"
+    name                       = "Allow-MySQL"
     priority                   = 1000      # Rule priority (lower = higher)
     direction                  = "Inbound" # Incoming traffic
     access                     = "Allow"   # Allow traffic
     protocol                   = "Tcp"     # TCP protocol
     source_port_range          = "*"       # All source ports
-    destination_port_range     = "5432"    # PostgreSQL port
+    destination_port_range     = "3306"    # MySQL port
     source_address_prefix      = "*"       # All IPs
     destination_address_prefix = "*"       # All IPs
   }
 }
 
 # =================================================================================
-# ASSOCIATE POSTGRESQL SUBNET WITH ITS NSG
+# ASSOCIATE MYSQL SUBNET WITH ITS NSG
 # =================================================================================
-resource "azurerm_subnet_network_security_group_association" "postgres-nsg-assoc" {
-  subnet_id                 = azurerm_subnet.postgres-subnet.id              # Subnet reference
-  network_security_group_id = azurerm_network_security_group.postgres-nsg.id # NSG reference
+resource "azurerm_subnet_network_security_group_association" "mysql-nsg-assoc" {
+  subnet_id                 = azurerm_subnet.mysql-subnet.id              # Subnet reference
+  network_security_group_id = azurerm_network_security_group.mysql-nsg.id # NSG reference
 }
 
 # =================================================================================
