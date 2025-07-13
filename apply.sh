@@ -13,7 +13,7 @@ fi
 # STEP 1: Provision mysql infrastructure (VNet, subnets, NICs, etc.)
 #-------------------------------------------------------------------------------
 
-cd 01-mysq;                            # Navigate to Terraform infra folder
+cd 01-mysql                            # Navigate to Terraform infra folder
 terraform init                         # Initialize Terraform plugins/backend
 terraform apply -auto-approve          # Apply infrastructure configuration without prompt
 cd ..                                  # Return to root directory
