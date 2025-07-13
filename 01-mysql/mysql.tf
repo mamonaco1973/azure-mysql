@@ -45,7 +45,6 @@ resource "azurerm_mysql_flexible_server" "mysql_instance" {
   backup_retention_days         = 7
   geo_redundant_backup_enabled  = false
   zone                          = "1"
-  public_network_access_enabled = false
 
   # Ensure MySQL is deployed into a delegated subnet
   delegated_subnet_id = azurerm_subnet.mysql-subnet.id
