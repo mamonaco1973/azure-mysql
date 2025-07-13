@@ -17,11 +17,11 @@ resource "azurerm_subnet" "mysql-subnet" {
   virtual_network_name = azurerm_virtual_network.project-vnet.name # Link to parent VNet
   address_prefixes     = ["10.0.0.0/25"]                           # 128 IPs (lower half of /23)
 
-  # Delegation required for PostgreSQL Flexible Server
+  # Delegation required for MySQL Flexible Server
   delegation {
     name = "delegation"
     service_delegation {
-      name    = "Microsoft.DBforPostgreSQL/flexibleServers"               # Required service
+      name    = "Microsoft.DBforMySQL/flexibleServers"                    # Required service
       actions = ["Microsoft.Network/virtualNetworks/subnets/join/action"] # Allow VNet actions
     }
   }
@@ -31,7 +31,7 @@ resource "azurerm_subnet" "mysql-subnet" {
 # CREATE NETWORK SECURITY GROUP (NSG) FOR MYSQL SUBNET
 # =================================================================================
 resource "azurerm_network_security_group" "mysql-nsg" {
-  name                = "mysql-nsg"                         # NSG name
+  name                = "mysql-nsg"                            # NSG name
   location            = var.project_location                   # Region (from variable)
   resource_group_name = azurerm_resource_group.project_rg.name # Target RG
 

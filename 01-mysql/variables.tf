@@ -12,7 +12,7 @@ variable "project_resource_group" {
 # -------------------------------------------------------------------------------------------------
 variable "project_vnet" {
   description = "Name of the Azure Virtual Network" # The logical network space for your project
-  default     = "mysql-vnet"                      # Default name — can be overridden via CLI/TFVars
+  default     = "mysql-vnet"                        # Default name — can be overridden via CLI/TFVars
   type        = string
 }
 
