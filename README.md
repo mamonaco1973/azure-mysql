@@ -128,7 +128,7 @@ After applying the Terraform scripts, the following Azure resources will be crea
 
 [phpMyAdmin](https://www.phpmyadmin.net/) is a popular web-based MySQL administration tool that allows users to interact with MySQL and MariaDB databases through a browser interface. It supports query execution, database browsing, import/export, and user management—all from a secure, private environment.
 
-![phpMyAdmin](phymyadmin.png)
+![phpMyAdmin](phpmyadmin.png)
 
 Query 1:
 ```sql
