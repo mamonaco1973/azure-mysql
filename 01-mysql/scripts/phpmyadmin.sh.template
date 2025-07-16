@@ -71,6 +71,12 @@ sudo sed -i "s|\(\$cfg\['blowfish_secret'\] = \).*|\1'$(openssl rand -base64 32)
 # Update the MySQL host in config.inc.php to point to the remote server
 sudo sed -i "s|\(\$cfg\['Servers'\]\[\$i\]\['host'\] = \).*|\1'$MYSQL_HOST';|" /usr/share/phpmyadmin/config.inc.php
 
+# Force SSL connection to MySQL server
+sudo tee -a /usr/share/phpmyadmin/config.inc.php > /dev/null <<'EOF'
+$cfg['Servers'][$i]['ssl'] = true;
+$cfg['Servers'][$i]['ssl_verify'] = false;
+EOF
+
 # Restart Apache to ensure changes to phpMyAdmin config take effect
 systemctl restart apache2
 
