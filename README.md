@@ -1,25 +1,25 @@
-# Deploying PostgreSQL on Azure
+# Deploying MySQL on Azure
 
-This project demonstrates how to deploy a secure, private PostgreSQL Flexible Server on Microsoft Azure using Terraform.
+This project demonstrates how to deploy a secure, private MySQL Flexible Server on Microsoft Azure using Terraform.
 
-The deployment includes a fully managed Azure PostgreSQL Flexible Server with public access disabled, integrated into a custom virtual network and secured with a Private DNS Zone for internal name resolution. Additionally, the project provisions a lightweight Ubuntu virtual machine that runs [pgweb](https://github.com/sosedoff/pgweb), a browser-based PostgreSQL client, allowing private, browser-accessible interaction with the database.
+The deployment provisions a fully managed Azure MySQL Flexible Server with public access disabled, integrated into a custom virtual network, and secured using a Private DNS Zone to enable internal name resolution. To provide convenient, private access for database interaction, the project also deploys a lightweight Ubuntu virtual machine that runs [phpMyAdmin](https://www.phpmyadmin.net/), a browser-based MySQL client accessible only within the virtual network.
 
-As part of the configuration, we deploy the [Pagila](https://www.postgresql.org/ftp/projects/pgFoundry/dbsamples/pagila/) sample dataset—a fictional DVD rental database—to showcase real-world querying and administration in a private cloud context. The solution is ideal for developers and teams looking to build secure, internal-facing applications without exposing the database to the public internet.
+As part of the setup, the [Sakila](https://dev.mysql.com/doc/sakila/en/) sample database—a fictional movie rental database—is loaded into the MySQL instance to demonstrate real-world queries, administration, and access control in a secure, private cloud environment. This solution is ideal for developers and teams building internal-facing applications without exposing database endpoints to the public internet.
 
-![diagram](azure-postgres.png)
+![diagram](azure-mysql.png)
 
 ## What You'll Learn
 
-- How to deploy a fully private PostgreSQL Flexible Server on Azure using Terraform
+- How to deploy a fully private MySQL Flexible Server on Azure using Terraform
 - How to configure a custom virtual network, subnet, and Private DNS Zone for secure, internal connectivity
-- How to provision a VM running `pgweb` for private browser-based database access
-- Best practices for securing Azure-managed databases with private endpoints and infrastructure-as-code
+- How to provision a VM running `phpMyAdmin` for private browser-based database access
+- Best practices for securing Azure-managed databases using private networking and infrastructure-as-code
 
-## Overview of Azure Database for PostgreSQL – Flexible Server
+## Overview of Azure Database for MySQL – Flexible Server
 
-Historically, Azure offered two deployment options for managed PostgreSQL databases: **Flexible Server** and **Single Server**.  Single Server is being phased out as of March 2025. Flexible Server provides enhanced control, performance, and configuration options, making it really the ideal for new deployments.
+Historically, Azure offered two deployment options for managed MySQL databases: **Flexible Server** and **Single Server**. Single Server is being retired in March 2025, and Flexible Server is now the recommended option for all new deployments due to its superior flexibility, performance, and security features.
 
-This project uses **Flexible Server** with private networking, allowing complete isolation of your database within an Azure Virtual Network. This ensures secure, internal-only access to your PostgreSQL instance—ideal for enterprise workloads, compliance requirements, and production-grade applications.
+This project uses **MySQL Flexible Server** with private networking, ensuring that your database is fully isolated within an Azure Virtual Network. This configuration supports secure, internal-only access—perfect for production workloads, enterprise security requirements, and regulated environments.
 
 ### Comparison: Flexible Server vs Single Server
 
@@ -28,19 +28,19 @@ This project uses **Flexible Server** with private networking, allowing complete
 | **Networking**                | Supports private endpoints and full VNet integration                                                | Public access with limited VNet support                                                |
 | **Availability Zones**        | Supports zone redundancy for high availability                                                      | Limited to single-AZ deployments                                                       |
 | **Maintenance Control**       | Fine-grained control over patching and maintenance windows                                          | Limited user control                                                                   |
-| **Scaling & Bursting**        | Supports compute burstable SKUs and custom backup retention policies                                | Limited scaling options                                                                |
+| **Scaling & Bursting**        | Supports burstable SKUs, autoscaling storage, and custom backup retention                           | Limited scaling options                                                                |
 | **Stop/Start Capabilities**   | Manual stop/start for dev/test cost savings                                                         | Not supported                                                                          |
 | **High Availability**         | Built-in HA with same-zone or zone-redundant standby                                                 | Asynchronous geo-redundant replica (manual promotion required)                         |
-| **Recommended For**           | Production workloads needing performance, flexibility, and security                                | Legacy workloads; not recommended for new deployments                                  |
+| **Recommended For**           | Production workloads needing performance, flexibility, and private access                          | Legacy workloads; not recommended for new deployments                                  |
 
 ### Notes on Azure vs AWS
 
-While AWS Aurora offers a distributed architecture with advanced features like Global Database and Serverless scaling, Azure Flexible Server provides a more traditional PostgreSQL setup focused on **network-level security, deployment control, and cost predictability**. Azure does not currently offer a direct equivalent to Aurora's distributed compute and storage layers, but Flexible Server fills the role of a secure, scalable managed PostgreSQL option within the Azure ecosystem.
+While AWS offers Aurora MySQL with a distributed backend and serverless options, Azure’s Flexible Server provides a more conventional MySQL experience focused on **network security, fine-grained operational control, and predictable cost**. Azure currently does not have a direct match to Aurora's shared-storage architecture but offers powerful VNet-integrated MySQL deployments suitable for most use cases.
 
 ## Choosing the Right Azure Option
 
-- **Use Flexible Server** if you need private networking, zone redundancy, and better control over maintenance, scaling, and security.
-- [**Avoid Single Server**](https://techcommunity.microsoft.com/blog/adforpostgresql/retiring-azure-database-for-postgresql-single-server-in-2025/3783783) for new projects, as it is being deprecated and lacks key enterprise features. 
+- **Use MySQL Flexible Server** if you require private networking, high availability, and better control over backups, maintenance, and performance.
+- [**Avoid Single Server**](https://techcommunity.microsoft.com/blog/adformysql/retiring-azure-database-for-mysql-single-server-in-2025/3829798) for new applications—it is deprecated and lacks modern enterprise capabilities.
 
 ## Prerequisites
 
@@ -53,8 +53,8 @@ If this is your first time watching our content, we recommend starting with this
 ## Download this Repository
 
 ```bash
-git clone https://github.com/mamonaco1973/azure-postgres.git
-cd azure-postgres
+git clone https://github.com/mamonaco1973/azure-mysql.git
+cd azure-mysql
 ```
 
 ## Build the Code
@@ -63,7 +63,7 @@ Run [check_env](check_env.sh) then run [apply](apply.sh).
 
 ```bash
 Destroy complete! Resources: 22 destroyed.
-~/azure-postgres$ ./apply.sh
+~/azure-mysql$ ./apply.sh
 NOTE: Validating that required commands are found in your PATH.
 NOTE: az is found in the current PATH.
 NOTE: terraform is found in the current PATH.
@@ -91,72 +91,110 @@ Terraform has been successfully initialized!
 After applying the Terraform scripts, the following Azure resources will be created:
 
 ### Virtual Network & Subnet
-- Virtual Network: `project-vnet`
+- Virtual Network: `mysql-vnet`
   - Address space: `10.0.0.0/23`
-- Subnet for PostgreSQL Flexible Server: `postgres-subnet`
+- Subnet for MySQL Flexible Server: `mysql-subnet`
   - Address range: `10.0.0.0/25`
-- Network Security Group: `postgres-nsg`
-  - Allows inbound PostgreSQL traffic on port 5432 from the pgweb VM
+- Network Security Group: `mysql-nsg`
+  - Allows inbound MySQL traffic on port 3306 from the phpMyAdmin VM
 
 ### Private DNS & Networking
-- Private DNS Zone: `privatelink.postgres.database.azure.com`
-  - Enables internal name resolution for the private PostgreSQL server
+- Private DNS Zone: `privatelink.mysql.database.azure.com`
+  - Enables internal name resolution for the private MySQL server
 - Private Endpoint:
-  - Linked to the PostgreSQL Flexible Server
+  - Linked to the MySQL Flexible Server
   - Associated with the custom subnet and DNS zone
 
 ### Azure Key Vault
-- Key Vault: `postgres-kv`
-  - Stores credentials securely
+- Key Vault: `creds-kv`
+  - Stores MySQL credentials securely
   - Access granted via Key Vault policy
 
-### PostgreSQL Flexible Server
+### MySQL Flexible Server
 - Server Name: Defined in variables
 - Configuration:
   - Private access only (public network access disabled)
   - Admin credentials retrieved from Azure Key Vault
-  - Preloaded with the [Pagila sample database](https://www.postgresql.org/ftp/projects/pgFoundry/dbsamples/pagila/)
+  - Preloaded with the [Sakila sample database](https://dev.mysql.com/doc/sakila/en/)
 
-### Virtual Machine (pgweb)
-- VM Name: `pgweb-vm`
-  - Ubuntu-based VM to host `pgweb` client
+### Virtual Machine (phpMyAdmin)
+- VM Name: `phpmyadmin-vm`
+  - Ubuntu-based VM to host the `phpMyAdmin` interface
   - Deployed in the same virtual network
-  - Connected privately to the PostgreSQL server
-  - Configured to launch `pgweb` and expose a browser-based PostgreSQL UI
+  - Connected privately to the MySQL server
+  - Configured to launch `phpMyAdmin` and expose a browser-based MySQL UI
 
-## pgweb Demo
+## phpMyAdmin Demo
 
-[pgweb](https://github.com/sosedoff/pgweb/blob/main/README.md) is a simple web-based and cross platform PostgreSQL database explorer.
+[phpMyAdmin](https://www.phpmyadmin.net/) is a popular web-based MySQL administration tool that allows users to interact with MySQL and MariaDB databases through a browser interface. It supports query execution, database browsing, import/export, and user management—all from a secure, private environment.
 
-![pgweb](pgweb.png)
+![phpMyAdmin](phymyadmin.png)
 
 Query 1:
 ```sql
--- Select the film title and full actor name for each film
 SELECT
-    f.title AS film_title,                                      -- Get the film's title from the 'film' table
-    a.first_name || ' ' || a.last_name AS actor_name            -- Concatenate actor's first and last name as 'actor_name'
+    -- Select the film title from the 'film' table and label the column 'film_title'
+    f.title AS film_title,
+
+    -- Concatenate the actor's first and last name with a space between them and label the column 'actor_name'
+    CONCAT(a.first_name, ' ', a.last_name) AS actor_name
+
 FROM
-    film f                                                      -- From the 'film' table aliased as 'f'
-JOIN film_actor fa ON f.film_id = fa.film_id                    -- Join with 'film_actor' to link films to their actors
-JOIN actor a ON fa.actor_id = a.actor_id                        -- Join with 'actor' table to get actor details
-ORDER BY f.title, actor_name                                    -- Order the results alphabetically by film title, then actor name
-LIMIT 20;                                                       -- Return only the first 20 results
+    -- Use the 'film' table as the main source of data (alias 'f')
+    sakila.film f
+
+    -- Join the 'film_actor' link table to associate films with their actors by film_id
+    JOIN sakila.film_actor fa
+        ON f.film_id = fa.film_id
+
+    -- Join the 'actor' table to get actor name details by actor_id
+    JOIN sakila.actor a
+        ON fa.actor_id = a.actor_id
+
+-- Sort the results first by film title alphabetically, then by actor name alphabetically within each film
+ORDER BY
+    f.title,
+    actor_name
+
+-- Return only the first 20 rows of the result set
+LIMIT 20;                                                   
 ```
 
 Query 2:
 
 ```sql
--- Select film titles and a comma-separated list of all actors in each film
 SELECT
-    f.title,                                                              -- Get the film's title from the 'film' table
-    STRING_AGG(a.first_name || ' ' || a.last_name, ', ') AS actor_names  -- Combine all actor full names into one comma-separated string
-FROM
-    film f                                                                -- From the 'film' table aliased as 'f'
-JOIN film_actor fa ON f.film_id = fa.film_id                              -- Join with 'film_actor' to link each film to its actors
-JOIN actor a ON fa.actor_id = a.actor_id                                  -- Join with 'actor' table to get actor names
-GROUP BY f.title                                                           -- Group results by film title so each row is one film
-ORDER BY f.title                                                           -- Sort the results alphabetically by film title
-LIMIT 20;                                                                  -- Return only the first 10 films
-```
+    -- Select the film title from the 'film' table
+    f.title,
 
+    -- Concatenate all actor full names (first + last name) into a single string
+    -- GROUP_CONCAT builds this list, ordering by actor last name, separating each with a comma and space
+    GROUP_CONCAT(
+        CONCAT(a.first_name, ' ', a.last_name)
+        ORDER BY a.last_name
+        SEPARATOR ', '
+    ) AS actor_names
+
+FROM
+    -- Use the 'film' table as the starting point (aliased as 'f')
+    sakila.film f
+
+    -- Join 'film_actor' to link films to their actors via film_id
+    JOIN sakila.film_actor fa
+        ON f.film_id = fa.film_id
+
+    -- Join 'actor' to get the actual actor names via actor_id
+    JOIN sakila.actor a
+        ON fa.actor_id = a.actor_id
+
+-- Group results by film title so each row represents a unique film
+GROUP BY
+    f.title
+
+-- Sort the output rows alphabetically by film title
+ORDER BY
+    f.title
+
+-- Only return the first 10 rows (the top 10 film titles alphabetically)
+LIMIT 10;
+```
