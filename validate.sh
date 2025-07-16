@@ -1,23 +1,23 @@
 #!/bin/bash
 
-# #-------------------------------------------------------------------------------
-# # Output pgweb URL and postgres DNS name
-# #-------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
+# Output phpmyadmin URL and mysql DNS name
+#-------------------------------------------------------------------------------
 
-# PGWEB_DNS_NAME=$(az network public-ip show \
-#   --name pgweb-vm-public-ip \
-#   --resource-group postgres-rg \
-#   --query "dnsSettings.fqdn" \
-#   --output tsv)
+PHPMYADMIN_DNS_NAME=$(az network public-ip show \
+   --name phpmyadmin-vm-public-ip \
+   --resource-group mysql-rg \
+   --query "dnsSettings.fqdn" \
+   --output tsv)
 
-# echo "NOTE: pgweb running at http://$PGWEB_DNS_NAME"
+echo "NOTE: phpmyadmin running at http://$PHPMYADMIN_DNS_NAME"
 
-# PG_DNS=$(az postgres flexible-server list \
-#   --resource-group postgres-rg \
-#   --query "[?starts_with(name, 'postgres-instance')].fullyQualifiedDomainName" \
-#   --output tsv)
+MYSQL_DNS=$(az mysql flexible-server list \
+   --resource-group mysql-rg \
+   --query "[?starts_with(name, 'mysql-instance')].fullyQualifiedDomainName" \
+   --output tsv)
 
-# echo "NOTE: Hostname for postgres server is \"$PG_DNS\""
+echo "NOTE: Hostname for mysql server is \"$MYSQL_DNS\""
 
 #-------------------------------------------------------------------------------
 # END OF SCRIPT
