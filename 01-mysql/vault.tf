@@ -44,7 +44,7 @@ resource "random_password" "mysql_password" {
 resource "azurerm_key_vault_secret" "mysql_secret" {
   name = "mysql-credentials" # Logical name of the secret
   value = jsonencode({       # JSON-encoded username + password
-    username = "mysql"
+    username = "admin"
     password = random_password.mysql_password.result
   })
   key_vault_id = azurerm_key_vault.credentials_key_vault.id   # Target Key Vault ID

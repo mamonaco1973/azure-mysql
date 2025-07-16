@@ -34,17 +34,17 @@ resource "azurerm_mysql_flexible_server" "mysql_instance" {
   resource_group_name    = azurerm_resource_group.project_rg.name
   location               = azurerm_resource_group.project_rg.location
   version                = "8.0.21"
-  administrator_login    = "mysqladmin"
+  administrator_login    = "admin"
   administrator_password = random_password.mysql_password.result
-  
+
   storage {
     size_gb = 32 # 32768 MB = 32 GB
   }
 
-  sku_name                      = "B_Standard_B1ms"
-  backup_retention_days         = 7
-  geo_redundant_backup_enabled  = false
-  zone                          = "1"
+  sku_name                     = "B_Standard_B1ms"
+  backup_retention_days        = 7
+  geo_redundant_backup_enabled = false
+  zone                         = "1"
 
   # Ensure MySQL is deployed into a delegated subnet
   delegated_subnet_id = azurerm_subnet.mysql-subnet.id
