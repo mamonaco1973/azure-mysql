@@ -54,14 +54,15 @@ resource "azurerm_linux_virtual_machine" "phpmyadmin-vm" {
     version   = "latest"           # Always pull the latest available image
   }
 
-  #   # ------------------------------------------------------
-  #   # Pass custom data (cloud-init) to the VM at creation
-  #   # ------------------------------------------------------
+  # ------------------------------------------------------
+  # Pass custom data (cloud-init) to the VM at creation
+  # ------------------------------------------------------
 
-  #   custom_data = base64encode(templatefile("./scripts/pgweb.sh.template", {
-  #     PGPASSWORD = random_password.postgres_password.result
-  #     PGENDPOINT = "postgres-instance-${random_string.suffix.result}.postgres.database.azure.com"
-  #   }))
+  custom_data = base64encode(templatefile("./scripts/phpmyadmin.sh.template", {
+    PASSWORD   = random_password.mysql_password.result
+    MYSQL_HOST = "mysql-instance-${random_string.suffix.result}.mysql.database.azure.com"
+    USER       = "sysadmin"
+  }))
 
   depends_on = [azurerm_mysql_flexible_server.mysql_instance]
 

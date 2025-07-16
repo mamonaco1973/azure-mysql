@@ -1,97 +1,104 @@
 #!/bin/bash
-# ----------------------------------------------------------------------------------
-# This script loads the Pagila sample database into an Azure PostgreSQL instance,
-# then installs and configures the pgweb UI for interacting with the database.
-# Intended for use on a newly provisioned Azure VM.
-# ----------------------------------------------------------------------------------
 
-# -------------------------------
-# UPDATE AND INSTALL DEPENDENCIES
-# -------------------------------
-apt update -y                           # Update APT package index (suppress confirmation)
-apt install -y postgresql-client unzip  # Install PostgreSQL CLI and unzip tool (non-interactive)
+# ---------------------------------------------------------------
+# UPDATE & INSTALL WEB + PHP + MYSQL CLIENT TOOLS
+# ---------------------------------------------------------------
 
-# -----------------------------------------------
-# CLONE GITHUB REPO CONTAINING PAGILA SQL FILES
-# -----------------------------------------------
-cd /tmp                               # Work in a temporary directory
-git clone https://github.com/mamonaco1973/azure-postgres.git  # Clone repository with SQL data
-cd azure-postgres/01-postgres/data    # Navigate to folder containing pagila SQL scripts
+# Update all package lists silently and auto-confirm upgrades
+sudo apt update -y
 
-# -------------------------
-# SET ENV VARS FOR DATABASE
-# -------------------------
-export PGPASSWORD="${PGPASSWORD}"    
-export PGENDPOINT="${PGENDPOINT}"  
+# Install Apache web server, PHP, required PHP extensions, unzip, and MySQL CLI tools (no server)
+sudo apt install apache2 php php-mysql php-mbstring php-zip php-gd php-json php-curl php-xml unzip mysql-client-core-8.0 -y
 
-# -----------------------
-# LOAD PAGILA INTO PGSQL
-# -----------------------
-# 1. Create 'pagila' database schema in default 'postgres' DB
-PGPASSWORD=$PGPASSWORD psql -h $PGENDPOINT -U postgres -d postgres -f pagila-db.sql > /tmp/db_load.log
+# ---------------------------------------------------------------
+# DOWNLOAD & DEPLOY PHPMYADMIN
+# ---------------------------------------------------------------
 
-# 2. Load schema into the new 'pagila' database
-PGPASSWORD=$PGPASSWORD psql -h $PGENDPOINT -U postgres -d pagila -f pagila-schema.sql >> /tmp/db_load.log
+# Move to Apache's shared web resource directory
+cd /usr/share
 
-# 3. Load data into the 'pagila' database
-PGPASSWORD=$PGPASSWORD psql -h $PGENDPOINT -U postgres -d pagila -f pagila-data.sql >> /tmp/db_load.log
+# Download phpMyAdmin 5.2.1 from official source (zip archive)
+sudo wget https://files.phpmyadmin.net/phpMyAdmin/5.2.1/phpMyAdmin-5.2.1-all-languages.zip
 
-# -----------------------------
-# INSTALL AND CONFIGURE PGWEB
-# -----------------------------
-# Download pgweb release (PostgreSQL web UI tool)
-wget https://github.com/sosedoff/pgweb/releases/download/v0.11.12/pgweb_linux_amd64.zip
+# Unzip silently and overwrite without prompting (-o = overwrite, -q = quiet)
+sudo unzip -o -q phpMyAdmin-5.2.1-all-languages.zip
 
-# Extract the binary
-unzip pgweb_linux_amd64.zip
+# Rename extracted folder to a clean, consistent name
+sudo mv phpMyAdmin-5.2.1-all-languages phpmyadmin
 
-# Make binary executable
-chmod +x pgweb_linux_amd64
+# Fix ownership so Apache (www-data) can read/write to it as needed
+sudo chown -R www-data:www-data /usr/share/phpmyadmin
 
-# Move pgweb to a system-wide path for execution
-sudo mv pgweb_linux_amd64 /usr/local/bin/pgweb
+# ---------------------------------------------------------------
+# CONFIGURE APACHE TO SERVE PHPMYADMIN
+# ---------------------------------------------------------------
 
-# ----------------------
-# DEFINE PGWEB VARIABLES
-# ----------------------
-PGWEB_BIN="/usr/local/bin/pgweb"  # Location of the pgweb binary
-PGWEB_USER="root"                 # User that will run the pgweb process
-PGWEB_HOME="/root"                # Home directory for pgweb process
-PGWEB_PORT="80"                   # HTTP port to bind pgweb to (adjust if needed)
+# Write an Apache config file that exposes phpMyAdmin at /phpmyadmin path
+sudo tee /etc/apache2/conf-available/phpmyadmin.conf > /dev/null <<EOF
+Alias /phpmyadmin /usr/share/phpmyadmin
 
-# --------------------------------------
-# VERIFY PGWEB WAS INSTALLED CORRECTLY
-# --------------------------------------
-if [ ! -f "$PGWEB_BIN" ]; then
-  echo "Error: $PGWEB_BIN not found"  # Abort if pgweb binary not in expected location
-  exit 1
-fi
-
-# ----------------------------------------
-# CREATE A SYSTEMD SERVICE FOR PGWEB
-# ----------------------------------------
-cat <<EOF > /etc/systemd/system/pgweb.service
-[Unit]
-Description=Pgweb - Web UI for PostgreSQL
-After=network.target                  
-
-[Service]
-Type=simple
-ExecStart=$PGWEB_BIN --listen=$PGWEB_PORT --bind 0.0.0.0  # Listen on all interfaces
-Restart=on-failure
-User=$PGWEB_USER
-WorkingDirectory=$PGWEB_HOME
-
-[Install]
-WantedBy=multi-user.target           
+<Directory /usr/share/phpmyadmin>
+    Options SymLinksIfOwnerMatch
+    DirectoryIndex index.php
+    Require all granted
+</Directory>
 EOF
 
-# -----------------------------
-# ENABLE AND START PGWEB SERVICE
-# -----------------------------
+# Enable the new phpMyAdmin config
+sudo a2enconf phpmyadmin
 
-systemctl daemon-reexec             # Re-exec systemd in case the binary changed
-systemctl daemon-reload             # Reload systemd unit files
-systemctl enable pgweb              # Enable pgweb to start at boot
-systemctl start pgweb               # Start pgweb immediately
-systemctl status pgweb | cat        # Check the status of the pgweb service
+# Reload Apache to apply the new configuration
+sudo systemctl reload apache2
+
+# ---------------------------------------------------------------
+# CONFIGURE PHPMYADMIN TO CONNECT TO REMOTE MYSQL SERVER
+# ---------------------------------------------------------------
+
+# Copy sample config to active config file
+sudo cp /usr/share/phpmyadmin/config.sample.inc.php /usr/share/phpmyadmin/config.inc.php
+
+# Define MySQL connection variables
+MYSQL_HOST="mysql-instance-qbge.mysql.database.azure.com"
+PASSWORD="19h4OKnEHRpe8Yv29mXT8p5B"
+USER="sysadmin"
+
+# Copy sample config again (redundant — already done above)
+sudo cp /usr/share/phpmyadmin/config.sample.inc.php /usr/share/phpmyadmin/config.inc.php
+
+# Inject a randomly generated 32-byte blowfish secret to secure cookies
+sudo sed -i "s|\(\$cfg\['blowfish_secret'\] = \).*|\1'$(openssl rand -base64 32)';|" /usr/share/phpmyadmin/config.inc.php
+
+# Update the MySQL host in config.inc.php to point to the remote server
+sudo sed -i "s|\(\$cfg\['Servers'\]\[\$i\]\['host'\] = \).*|\1'$MYSQL_HOST';|" /usr/share/phpmyadmin/config.inc.php
+
+# Restart Apache to ensure changes to phpMyAdmin config take effect
+systemctl restart apache2
+
+# ---------------------------------------------------------------
+# OPTIONAL: DOWNLOAD & LOAD SAKILA SAMPLE DATABASE
+# ---------------------------------------------------------------
+
+# Clean up any old sakila files
+cd /tmp
+rm -f -r sakila-db
+rm -f -r sakila*.zip*
+
+# Download Sakila sample database from MySQL docs site
+wget -q https://downloads.mysql.com/docs/sakila-db.zip
+
+# Unzip the Sakila zip archive silently
+unzip -o -q sakila-db.zip
+
+# Create the 'sakila' database if it doesn't already exist
+mysql -h "$MYSQL_HOST" -u "$USER" -p"$PASSWORD" -e "CREATE DATABASE IF NOT EXISTS sakila;"
+
+# Load schema (tables, constraints) into sakila DB
+mysql -h "$MYSQL_HOST" -u "$USER" -p"$PASSWORD" sakila < ./sakila-db/sakila-schema.sql
+
+# Load data (rows/records) into sakila DB
+mysql -h "$MYSQL_HOST" -u "$USER" -p"$PASSWORD" sakila < ./sakila-db/sakila-data.sql
+
+# ---------------------------------------------------------------------
+# DONE — phpMyAdmin is live at http://<your-server-ip>/phpmyadmin
+# Log in using: sysadmin@mysql-instance-qbge.mysql.database.azure.com
+# ---------------------------------------------------------------------
