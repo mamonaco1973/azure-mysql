@@ -17,14 +17,14 @@ sudo apt install apache2 php php-mysql php-mbstring php-zip php-gd php-json php-
 # Move to Apache's shared web resource directory
 cd /usr/share
 
-# Download phpMyAdmin 5.2.1 from official source (zip archive)
-sudo wget https://files.phpmyadmin.net/phpMyAdmin/5.2.1/phpMyAdmin-5.2.1-all-languages.zip
+# Download phpMyAdmin 5.2.2 from official source (zip archive)
+sudo wget https://files.phpmyadmin.net/phpMyAdmin/5.2.2/phpMyAdmin-5.2.2-all-languages.zip
 
 # Unzip silently and overwrite without prompting (-o = overwrite, -q = quiet)
-sudo unzip -o -q phpMyAdmin-5.2.1-all-languages.zip
+sudo unzip -o -q phpMyAdmin-5.2.2-all-languages.zip
 
 # Rename extracted folder to a clean, consistent name
-sudo mv phpMyAdmin-5.2.1-all-languages phpmyadmin
+sudo mv phpMyAdmin-5.2.2-all-languages phpmyadmin
 
 # Fix ownership so Apache (www-data) can read/write to it as needed
 sudo chown -R www-data:www-data /usr/share/phpmyadmin
@@ -66,7 +66,7 @@ USER="${USER}"
 sudo cp /usr/share/phpmyadmin/config.sample.inc.php /usr/share/phpmyadmin/config.inc.php
 
 # Inject a randomly generated 32-byte blowfish secret to secure cookies
-sudo sed -i "s|\(\$cfg\['blowfish_secret'\] = \).*|\1'$(openssl rand -base64 32)';|" /usr/share/phpmyadmin/config.inc.php
+sudo sed -i "s|\(\$cfg\['blowfish_secret'\] = \).*|\1'$(openssl rand -hex 16)';|" /usr/share/phpmyadmin/config.inc.php
 
 # Update the MySQL host in config.inc.php to point to the remote server
 sudo sed -i "s|\(\$cfg\['Servers'\]\[\$i\]\['host'\] = \).*|\1'$MYSQL_HOST';|" /usr/share/phpmyadmin/config.inc.php
@@ -77,7 +77,29 @@ $cfg['Servers'][$i]['ssl'] = true;
 $cfg['Servers'][$i]['ssl_verify'] = false;
 EOF
 
-# Restart Apache to ensure changes to phpMyAdmin config take effect
+# ---------------------------------------------------------------
+# REPLACE DEFAULT INDEX.HTML WITH REDIRECT TO /phpmyadmin
+# ---------------------------------------------------------------
+sudo tee /var/www/html/index.html > /dev/null <<EOF
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="refresh" content="0; url=./phpmyadmin" />
+    <script>
+      window.location.href = "./phpmyadmin";
+    </script>
+    <title>Redirecting...</title>
+  </head>
+  <body>
+    If you are not redirected automatically, <a href="./phpmyadmin">click here</a>.
+  </body>
+</html>
+EOF
+
+# ---------------------------------------------------------------
+# RESTART APACHE TO APPLY FINAL CHANGES
+# ---------------------------------------------------------------
+
 systemctl restart apache2
 
 # ---------------------------------------------------------------
@@ -103,6 +125,9 @@ mysql -h "$MYSQL_HOST" -u "$USER" -p"$PASSWORD" sakila < ./sakila-db/sakila-sche
 
 # Load data (rows/records) into sakila DB
 mysql -h "$MYSQL_HOST" -u "$USER" -p"$PASSWORD" sakila < ./sakila-db/sakila-data.sql
+
+# Load phpMyAdmin's default tables into the MySQL server
+mysql -h "$MYSQL_HOST" -u "$USER" -p"$PASSWORD" < /usr/share/phpmyadmin/sql/create_tables.sql
 
 # ---------------------------------------------------------------------
 # DONE — phpMyAdmin is live at http://<your-server-ip>/phpmyadmin
