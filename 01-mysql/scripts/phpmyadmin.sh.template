@@ -58,9 +58,9 @@ sudo systemctl reload apache2
 sudo cp /usr/share/phpmyadmin/config.sample.inc.php /usr/share/phpmyadmin/config.inc.php
 
 # Define MySQL connection variables
-MYSQL_HOST="mysql-instance-qbge.mysql.database.azure.com"
-PASSWORD="19h4OKnEHRpe8Yv29mXT8p5B"
-USER="sysadmin"
+MYSQL_HOST="${MYSQL_HOST}"
+PASSWORD="${PASSWORD}"
+USER="${USER}"
 
 # Copy sample config again (redundant — already done above)
 sudo cp /usr/share/phpmyadmin/config.sample.inc.php /usr/share/phpmyadmin/config.inc.php
