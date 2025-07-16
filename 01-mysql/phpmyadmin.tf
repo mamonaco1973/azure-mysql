@@ -11,7 +11,7 @@ resource "azurerm_network_interface" "phpmyadmin-vm-nic" {
     name                          = "internal"
     subnet_id                     = azurerm_subnet.vm-subnet.id
     private_ip_address_allocation = "Dynamic"
-    public_ip_address_id          = azurerm_public_ip.pgweb_vm_public_ip.id
+    public_ip_address_id          = azurerm_public_ip.phpmyadmin_vm_public_ip.id
   }
 }
 
