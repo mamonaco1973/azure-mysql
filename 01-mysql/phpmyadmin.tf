@@ -66,13 +66,6 @@ resource "azurerm_linux_virtual_machine" "phpmyadmin-vm" {
   depends_on = [azurerm_mysql_flexible_server.mysql_instance]
 
 }
-
-resource "random_string" "suffix" {
-  length  = 4
-  upper   = false
-  special = false
-}
-
 resource "azurerm_public_ip" "phpmyadmin_vm_public_ip" {
   name                = "phpmyadmin-vm-public-ip"
   location            = var.project_location
