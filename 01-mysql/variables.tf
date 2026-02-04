@@ -1,35 +1,69 @@
-# -------------------------------------------------------------------------------------------------
-# DEFINE THE NAME OF THE AZURE RESOURCE GROUP
-# -------------------------------------------------------------------------------------------------
+# =================================================================================
+# INPUT VARIABLES
+# ---------------------------------------------------------------------------------
+# Purpose:
+#   Centralize configurable inputs for naming and regional deployment. These
+#   variables define the baseline Azure resource names and location used across
+#   the Terraform configuration.
+#
+# Notes:
+#   - Defaults are provided for convenience in lab/demo deployments
+#   - Override via terraform.tfvars or -var to align with your environment
+# =================================================================================
+
+# =================================================================================
+# RESOURCE GROUP NAME
+# ---------------------------------------------------------------------------------
+# Purpose:
+#   Name of the Azure Resource Group that acts as the top-level container for
+#   all resources in this deployment.
+# =================================================================================
 variable "project_resource_group" {
-  description = "Name of the Azure Resource Group" # This is the container for all resources
-  default     = "mysql-rg"                         # Default RG name unless overridden
-  type        = string                             # Must be a string (no lists, no objects)
+  description = "Name of the Azure Resource Group"
+  type        = string
+  default     = "mysql-rg"
 }
 
-# -------------------------------------------------------------------------------------------------
-# DEFINE THE NAME OF THE VIRTUAL NETWORK (VNET)
-# -------------------------------------------------------------------------------------------------
+# =================================================================================
+# VIRTUAL NETWORK NAME
+# ---------------------------------------------------------------------------------
+# Purpose:
+#   Name of the Azure Virtual Network (VNet) used as the logical network
+#   boundary for all subnets and connected resources.
+# =================================================================================
 variable "project_vnet" {
-  description = "Name of the Azure Virtual Network" # The logical network space for your project
-  default     = "mysql-vnet"                        # Default name — can be overridden via CLI/TFVars
+  description = "Name of the Azure Virtual Network"
   type        = string
+  default     = "mysql-vnet"
 }
 
-# -------------------------------------------------------------------------------------------------
-# DEFINE THE NAME OF THE SUBNET INSIDE THE VNET
-# -------------------------------------------------------------------------------------------------
+# =================================================================================
+# MYSQL SUBNET NAME
+# ---------------------------------------------------------------------------------
+# Purpose:
+#   Name of the subnet used for the MySQL Flexible Server delegated subnet.
+#
+# Notes:
+#   - This subnet is delegated to Microsoft.DBforMySQL/flexibleServers
+# =================================================================================
 variable "project_subnet" {
-  description = "Name of the Azure Subnet within the Virtual Network" # Subdivision of the VNet where VMs live
-  default     = "mysql-subnet"                                        # Keep separate from Bastion subnet
+  description = "Name of the Azure Subnet within the Virtual Network"
   type        = string
+  default     = "mysql-subnet"
 }
 
-# -------------------------------------------------------------------------------------------------
-# DEFINE THE AZURE REGION FOR RESOURCE DEPLOYMENT
-# -------------------------------------------------------------------------------------------------
+# =================================================================================
+# DEPLOYMENT LOCATION
+# ---------------------------------------------------------------------------------
+# Purpose:
+#   Azure region where resources will be deployed.
+#
+# Notes:
+#   - The value must be a valid Azure location name
+#   - Ensure the region supports all required SKUs/services in this project
+# =================================================================================
 variable "project_location" {
-  description = "Azure region where resources will be deployed (e.g., eastus, westeurope)" # Must match available Azure regions
-  default     = "Central US"                                                               # Change this if deploying in a different region
+  description = "Azure region where resources will be deployed (e.g., eastus)"
   type        = string
+  default     = "Central US"
 }

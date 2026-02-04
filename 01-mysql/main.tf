@@ -1,31 +1,71 @@
-
 # =================================================================================
-# CONFIGURE THE AZURERM PROVIDER TO INTERACT WITH AZURE RESOURCES
+# AZURE PROVIDER CONFIGURATION
+# ---------------------------------------------------------------------------------
+# Purpose:
+#   Configure the AzureRM provider to enable Terraform interaction with Azure
+#   resource management APIs.
+#
+# Notes:
+#   - The `features {}` block is mandatory, even when no features are configured.
+#   - Removing this block will cause provider initialization to fail.
 # =================================================================================
 provider "azurerm" {
-  features {} # Required block to enable AzureRM features; must be included even if empty
-  # Do NOT remove this block — it's mandatory for provider initialization
+  features {}
 }
 
 # =================================================================================
-# FETCH DETAILS ABOUT THE CURRENT AZURE SUBSCRIPTION
+# CURRENT AZURE SUBSCRIPTION CONTEXT
+# ---------------------------------------------------------------------------------
+# Purpose:
+#   Retrieve metadata for the currently active Azure subscription.
+#
+# Exposed Attributes:
+#   - subscription_id : Unique identifier for the Azure subscription
+#   - display_name    : Human-readable subscription name
+#   - tenant_id       : Azure AD tenant associated with the subscription
+#
+# Usage:
+#   - Resource tagging
+#   - Tenant- or subscription-scoped logic
+#   - Cross-subscription references
 # =================================================================================
 data "azurerm_subscription" "primary" {}
-# Returns subscription_id, display_name, and tenant_id
-# Useful for tagging, cross-subscription logic, or referencing tenant scope
 
 # =================================================================================
-# FETCH AUTH CONTEXT FOR CURRENT AZURE CLI OR SERVICE PRINCIPAL
+# AUTHENTICATED CLIENT CONTEXT
+# ---------------------------------------------------------------------------------
+# Purpose:
+#   Retrieve identity details for the authenticated Azure CLI user or service
+#   principal executing the Terraform workflow.
+#
+# Exposed Attributes:
+#   - client_id : Application (service principal) client ID
+#   - object_id : Object ID of the authenticated identity
+#   - tenant_id : Azure AD tenant ID
+#
+# Usage:
+#   - Role assignments
+#   - Managed identity bindings
+#   - Secure resource access configuration
 # =================================================================================
 data "azurerm_client_config" "current" {}
-# Returns object_id, client_id, tenant_id of the currently authenticated principal
-# Essential for assigning roles, linking managed identities, and securing resources
 
 # =================================================================================
-# CREATE THE PRIMARY RESOURCE GROUP FOR ALL DEPLOYED RESOURCES
+# PRIMARY RESOURCE GROUP
+# ---------------------------------------------------------------------------------
+# Purpose:
+#   Create the top-level Azure resource group used to contain all infrastructure
+#   resources deployed by this Terraform project.
+#
+# Inputs:
+#   - project_resource_group : Resource group name
+#   - project_location       : Azure region for deployment
+#
+# Notes:
+#   - Acts as a logical boundary for lifecycle management
+#   - Simplifies cleanup, access control, and cost tracking
 # =================================================================================
 resource "azurerm_resource_group" "project_rg" {
-  name     = var.project_resource_group # Name for the resource group (from input variable)
-  location = var.project_location       # Azure region to deploy into (from input variable)
-  # This group will act as the logical container for all related infrastructure
+  name     = var.project_resource_group
+  location = var.project_location
 }

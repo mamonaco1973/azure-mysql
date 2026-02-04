@@ -1,30 +1,44 @@
 #!/bin/bash
+# ==============================================================================
+# File: apply.sh
+# ==============================================================================
+# Purpose:
+#   Validate prerequisites, deploy the MySQL Terraform stack, and run
+#   post-deployment validation.
+#
+# Behavior:
+#   - Fail-fast: exit immediately on any error
+#   - No directory stack manipulation
+#   - Linear, easy-to-read execution flow
+#
+# Requirements:
+#   - check_env.sh must exist and be executable
+#   - Terraform must be installed and available in PATH
+#   - Azure authentication must already be established
+# ==============================================================================
+set -euo pipefail
 
-#-------------------------------------------------------------------------------
-# STEP 0: Run environment validation script
-#-------------------------------------------------------------------------------
+# ==============================================================================
+# STEP 0: Validate environment prerequisites
+# ==============================================================================
 ./check_env.sh
-if [ $? -ne 0 ]; then
-  echo "ERROR: Environment check failed. Exiting."
-  exit 1  # Hard exit if environment validation fails
-fi
 
-#-------------------------------------------------------------------------------
-# STEP 1: Provision mysql infrastructure (VNet, subnets, NICs, etc.)
-#-------------------------------------------------------------------------------
+# ==============================================================================
+# STEP 1: Provision MySQL infrastructure
+# ==============================================================================
+cd 01-mysql
 
-cd 01-mysql                            # Navigate to Terraform infra folder
-terraform init                         # Initialize Terraform plugins/backend
-terraform apply -auto-approve          # Apply infrastructure configuration without prompt
-cd ..                                  # Return to root directory
+terraform init
+terraform apply -auto-approve
 
-#-------------------------------------------------------------------------------
-# STEP 2: Run validate script.
-#-------------------------------------------------------------------------------
+cd ..
 
+# ==============================================================================
+# STEP 2: Run post-deployment validation
+# ==============================================================================
 echo ""
 ./validate.sh
 
-#-------------------------------------------------------------------------------
-# END OF SCRIPT
-#-------------------------------------------------------------------------------
+# ==============================================================================
+# END
+# ==============================================================================

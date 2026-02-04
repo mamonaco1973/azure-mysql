@@ -1,13 +1,31 @@
 #!/bin/bash
+# ==============================================================================
+# File: destroy.sh
+# ==============================================================================
+# Purpose:
+#   Tear down the MySQL Terraform stack and all associated Azure resources.
+#
+# Behavior:
+#   - Fail-fast: exit immediately on any error
+#   - Linear execution with explicit directory changes
+#   - Destroys all resources defined in the MySQL stack
+#
+# Requirements:
+#   - Terraform must be installed and available in PATH
+#   - Azure authentication must already be established
+# ==============================================================================
+set -euo pipefail
 
-#-------------------------------------------------------------------------------
-# STEP 1: Destroy mysql infrastructure (VNet, Subnet, NICs, NSGs, etc.)
-#-------------------------------------------------------------------------------
-cd 01-mysql                            # Go to base infra config
-terraform init                         # Initialize Terraform plugins/modules
-terraform destroy -auto-approve        # Destroy all foundational Azure resources
-cd ..                                  # Return to root
+# ==============================================================================
+# STEP 1: Destroy MySQL infrastructure
+# ==============================================================================
+cd 01-mysql
 
-#-------------------------------------------------------------------------------
-# END OF SCRIPT
-#-------------------------------------------------------------------------------
+terraform init
+terraform destroy -auto-approve
+
+cd ..
+
+# ==============================================================================
+# END
+# ==============================================================================
