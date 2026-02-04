@@ -74,7 +74,7 @@ resource "azurerm_mysql_flexible_server" "mysql_instance" {
   name                = "mysql-instance-${random_string.suffix.result}"
   resource_group_name = azurerm_resource_group.project_rg.name
   location            = azurerm_resource_group.project_rg.location
-  #version                = "8.0.21"
+  version                = "8.0.21"
   administrator_login    = "sysadmin"
   administrator_password = random_password.mysql_password.result
 
