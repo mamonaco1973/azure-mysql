@@ -13,12 +13,13 @@
 # Notes:
 #   - The DNS zone must exist before the VNet link can be created
 # =================================================================================
+
 resource "azurerm_private_dns_zone_virtual_network_link" "mysql_dns_link" {
   name                  = "mysql-dns-link"
-  resource_group_name   = azurerm_resource_group.project_rg.name
-  private_dns_zone_name = azurerm_private_dns_zone.mysql_private_dns.name
+  private_dns_zone_id   = azurerm_private_dns_zone.mysql_private_dns.id
   virtual_network_id    = azurerm_virtual_network.project-vnet.id
 }
+
 
 # =================================================================================
 # RANDOM SUFFIX FOR GLOBAL NAME UNIQUENESS
