@@ -1,200 +1,152 @@
-# Deploying MySQL on Azure
+# MySQL on Azure: Azure Database for MySQL Flexible Server with phpMyAdmin
 
-This project demonstrates how to deploy a secure, private MySQL Flexible Server on Microsoft Azure using Terraform.
+A private **Azure Database for MySQL Flexible Server**, built with Terraform
+and loaded with the [Sakila](https://dev.mysql.com/doc/sakila/en/) sample
+database. The server has no public endpoint; a **phpMyAdmin** VM with a public
+IP gives you a browser client for it.
 
-The deployment provisions a fully managed Azure MySQL Flexible Server with public access disabled, integrated into a custom virtual network, and secured using a Private DNS Zone to enable internal name resolution. To provide convenient, private access for database interaction, the project also deploys a lightweight Ubuntu virtual machine that runs [phpMyAdmin](https://www.phpmyadmin.net/), a browser-based MySQL client accessible only within the virtual network.
+![phpMyAdmin](phpmyadmin.png)
 
-As part of the setup, the [Sakila](https://dev.mysql.com/doc/sakila/en/) sample database—a fictional movie rental database—is loaded into the MySQL instance to demonstrate real-world queries, administration, and access control in a secure, private cloud environment. This solution is ideal for developers and teams building internal-facing applications without exposing database endpoints to the public internet.
+| Piece | Where | Role |
+|---|---|---|
+| **MySQL Flexible Server** | `mysql-subnet` (delegated) | `mysql-instance-<suffix>`, MySQL 8.4, `B_Standard_B1ms`, 32 GB, 7-day backups, zone 1; VNet-integrated, no public access |
+| **Private DNS zone** | linked to `mysql-vnet` | `privatelink.mysql.database.azure.com`, so the server's name resolves to its private IP |
+| **phpmyadmin-vm** | `vm-subnet`, public IP | Ubuntu 24.04, `Standard_B1s`; loads Sakila, then serves phpMyAdmin 5.2.2 |
+| **Key Vault** | `mysql-rg` | `creds-kv-<suffix>`: `mysql-credentials` (database admin) and `vm-credentials` (VM login) |
 
-![diagram](azure-mysql.png)
+## Architecture
 
-## What You'll Learn
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="architecture-dark.svg">
+  <img alt="A browser reaches phpmyadmin-vm, an Ubuntu 24.04 VM with a public IP, over HTTP. At boot the VM downloads phpMyAdmin and the Sakila sample database, loads Sakila into the MySQL Flexible Server and serves phpMyAdmin, which connects to the server on port 3306 over TLS. The server has no public endpoint: it sits in a delegated subnet and its name resolves through a private DNS zone linked to the VNet. The passwords are in Key Vault." src="architecture-light.svg">
+</picture>
 
-- How to deploy a fully private MySQL Flexible Server on Azure using Terraform
-- How to configure a custom virtual network, subnet, and Private DNS Zone for secure, internal connectivity
-- How to provision a VM running `phpMyAdmin` for private browser-based database access
-- Best practices for securing Azure-managed databases using private networking and infrastructure-as-code
+Regenerate with `python3 make_diagram.py`.
 
-## Overview of Azure Database for MySQL – Flexible Server
+- **`01-mysql/`** is the whole stack: the resource group (`mysql-rg`), the
+  VNet (`mysql-vnet`, 10.0.0.0/23) with the delegated `mysql-subnet`
+  (10.0.0.0/25) and `vm-subnet` (10.0.1.0/25), the NSGs, the private DNS
+  zone, the Flexible Server, the Key Vault and passwords, and the phpMyAdmin
+  VM.
 
-Historically, Azure offered two deployment options for managed MySQL databases: **Flexible Server** and **Single Server**. Single Server is being retired in March 2025, and Flexible Server is now the recommended option for all new deployments due to its superior flexibility, performance, and security features.
+## How it boots
 
-This project uses **MySQL Flexible Server** with private networking, ensuring that your database is fully isolated within an Azure Virtual Network. This configuration supports secure, internal-only access—perfect for production workloads, enterprise security requirements, and regulated environments.
+1. Terraform builds the network, the Key Vault, the Flexible Server and the
+   VM, generating 24-character passwords for the `sysadmin` database admin
+   and the `sysadmin` VM login.
+2. The VM installs Apache, PHP and the MySQL client, downloads phpMyAdmin
+   5.2.2, and points it at the server over TLS (`ssl = true`, certificate not
+   verified). `/` redirects to `/phpmyadmin`.
+3. It downloads Sakila from dev.mysql.com and loads the schema and data, then
+   creates phpMyAdmin's own configuration tables in a `phpmyadmin` database.
 
-### Comparison: Flexible Server vs Single Server
+## Network security
 
-| **Aspect**                     | **Flexible Server**                                                                                 | **Single Server (Legacy)**                                                              |
-|-------------------------------|------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------|
-| **Networking**                | Supports private endpoints and full VNet integration                                                | Public access with limited VNet support                                                |
-| **Availability Zones**        | Supports zone redundancy for high availability                                                      | Limited to single-AZ deployments                                                       |
-| **Maintenance Control**       | Fine-grained control over patching and maintenance windows                                          | Limited user control                                                                   |
-| **Scaling & Bursting**        | Supports burstable SKUs, autoscaling storage, and custom backup retention                           | Limited scaling options                                                                |
-| **Stop/Start Capabilities**   | Manual stop/start for dev/test cost savings                                                         | Not supported                                                                          |
-| **High Availability**         | Built-in HA with same-zone or zone-redundant standby                                                 | Asynchronous geo-redundant replica (manual promotion required)                         |
-| **Recommended For**           | Production workloads needing performance, flexibility, and private access                          | Legacy workloads; not recommended for new deployments                                  |
+```
+internet ─80, 22─▶ phpmyadmin-vm ─3306─▶ MySQL Flexible Server (delegated subnet)
+```
 
-### Notes on Azure vs AWS
+| NSG | Subnet | Allows |
+|---|---|---|
+| `vm-nsg` | `vm-subnet` | 80 and 22 from anywhere |
+| `mysql-nsg` | `mysql-subnet` | 3306 from anywhere |
 
-While AWS offers Aurora MySQL with a distributed backend and serverless options, Azure’s Flexible Server provides a more conventional MySQL experience focused on **network security, fine-grained operational control, and predictable cost**. Azure currently does not have a direct match to Aurora's shared-storage architecture but offers powerful VNet-integrated MySQL deployments suitable for most use cases.
-
-## Choosing the Right Azure Option
-
-- **Use MySQL Flexible Server** if you require private networking, high availability, and better control over backups, maintenance, and performance.
-- [**Avoid Single Server**](https://techcommunity.microsoft.com/blog/adformysql/retiring-azure-database-for-mysql-single-server-in-2025/3829798) for new applications—it is deprecated and lacks modern enterprise capabilities.
+The server is VNet-integrated with no public endpoint, so `mysql-nsg` only
+matters inside the VNet.
 
 ## Prerequisites
 
 * [An Azure Account](https://portal.azure.com/)
-* [Install AZ CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) 
-* [Install Latest Terraform](https://developer.hashicorp.com/terraform/install)
+* [Install AZ CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli)
+* [Install Terraform](https://developer.hashicorp.com/terraform/install)
+* [Install jq](https://jqlang.github.io/jq/download/)
 
-If this is your first time watching our content, we recommend starting with this video: [Azure + Terraform: Easy Setup](https://youtu.be/j4aRjgH5H8Q). It provides a step-by-step guide to properly configure Terraform, and the AZ CLI.
+`check_env.sh` expects a service principal in `ARM_CLIENT_ID`,
+`ARM_CLIENT_SECRET`, `ARM_SUBSCRIPTION_ID` and `ARM_TENANT_ID`. If this is
+your first time watching our content, we recommend starting with this video:
+[Azure + Terraform: Easy Setup](https://youtu.be/j4aRjgH5H8Q).
 
-## Download this Repository
+## Deploy
 
 ```bash
 git clone https://github.com/mamonaco1973/azure-mysql.git
 cd azure-mysql
+./apply.sh       # one phase: VNet, Key Vault, Flexible Server, phpMyAdmin VM
 ```
 
-## Build the Code
+Everything deploys to Central US. `apply.sh` ends by running `validate.sh`,
+which waits for phpMyAdmin to answer (up to 15 minutes) and prints:
 
-Run [check_env](check_env.sh) then run [apply](apply.sh).
+```
+===============================================================================
+BUILD VALIDATION RESULTS
+===============================================================================
+phpMyAdmin URL:
+  http://phpmyadmin-a1b2.centralus.cloudapp.azure.com/
+
+MySQL Flexible Server Endpoint:
+  mysql-instance-a1b2.mysql.database.azure.com
+===============================================================================
+```
+
+## Try it
+
+1. Get the database password from Key Vault:
+
+   ```bash
+   vault=$(az keyvault list -g mysql-rg --query "[0].name" -o tsv)
+   az keyvault secret show --vault-name "$vault" --name mysql-credentials \
+     --query value -o tsv | jq -r .password
+   ```
+
+2. Open the phpMyAdmin URL and sign in as `sysadmin`. The `sakila` database
+   is in the tree on the left.
+3. Run the sample queries from the **SQL** tab:
+
+   ```sql
+   SELECT
+       f.title AS film_title,
+       CONCAT(a.first_name, ' ', a.last_name) AS actor_name
+   FROM sakila.film f
+   JOIN sakila.film_actor fa ON f.film_id = fa.film_id
+   JOIN sakila.actor a ON fa.actor_id = a.actor_id
+   ORDER BY f.title, actor_name
+   LIMIT 20;
+   ```
+
+   ```sql
+   SELECT
+       f.title,
+       GROUP_CONCAT(
+           CONCAT(a.first_name, ' ', a.last_name)
+           ORDER BY a.last_name
+           SEPARATOR ', '
+       ) AS actor_names
+   FROM sakila.film f
+   JOIN sakila.film_actor fa ON f.film_id = fa.film_id
+   JOIN sakila.actor a ON fa.actor_id = a.actor_id
+   GROUP BY f.title
+   ORDER BY f.title
+   LIMIT 10;
+   ```
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `validate.sh` keeps retrying | The VM is still installing. SSH in as `sysadmin` (password in `vm-credentials`) and `sudo tail /var/log/cloud-init-output.log`. |
+| `sakila` is missing | The load runs at the end of cloud-init; check the end of `/var/log/cloud-init-output.log` for `mysql` errors. |
+| Sign-in fails | Use the password from `mysql-credentials`, not `vm-credentials`. |
+| You want a local client | The server is private. Connect from the VM (`mysql -h <endpoint> -u sysadmin -p --ssl-mode=REQUIRED`). |
+
+## Teardown
 
 ```bash
-Destroy complete! Resources: 22 destroyed.
-~/azure-mysql$ ./apply.sh
-NOTE: Validating that required commands are found in your PATH.
-NOTE: az is found in the current PATH.
-NOTE: terraform is found in the current PATH.
-NOTE: jq is found in the current PATH.
-NOTE: All required commands are available.
-NOTE: Validating that required environment variables are set.
-NOTE: ARM_CLIENT_ID is set.
-NOTE: ARM_CLIENT_SECRET is set.
-NOTE: ARM_SUBSCRIPTION_ID is set.
-NOTE: ARM_TENANT_ID is set.
-NOTE: All required environment variables are set.
-NOTE: Logging in to Azure using Service Principal...
-NOTE: Successfully logged into Azure.
-Initializing the backend...
-Initializing provider plugins...
-- Reusing previous version of hashicorp/azurerm from the dependency lock file
-- Reusing previous version of hashicorp/random from the dependency lock file
-- Using previously-installed hashicorp/azurerm v4.35.0
-- Using previously-installed hashicorp/random v3.7.2
-
-Terraform has been successfully initialized!
-```
-## Build Results
-
-After applying the Terraform scripts, the following Azure resources will be created:
-
-### Virtual Network & Subnet
-- Virtual Network: `mysql-vnet`
-  - Address space: `10.0.0.0/23`
-- Subnet for MySQL Flexible Server: `mysql-subnet`
-  - Address range: `10.0.0.0/25`
-- Network Security Group: `mysql-nsg`
-  - Allows inbound MySQL traffic on port 3306 from the phpMyAdmin VM
-
-### Private DNS & Networking
-- Private DNS Zone: `privatelink.mysql.database.azure.com`
-  - Enables internal name resolution for the private MySQL server
-- Private Endpoint:
-  - Linked to the MySQL Flexible Server
-  - Associated with the custom subnet and DNS zone
-
-### Azure Key Vault
-- Key Vault: `creds-kv`
-  - Stores MySQL credentials securely
-  - Access granted via Key Vault policy
-
-### MySQL Flexible Server
-- Server Name: Defined in variables
-- Configuration:
-  - Private access only (public network access disabled)
-  - Admin credentials retrieved from Azure Key Vault
-  - Preloaded with the [Sakila sample database](https://dev.mysql.com/doc/sakila/en/)
-
-### Virtual Machine (phpMyAdmin)
-- VM Name: `phpmyadmin-vm`
-  - Ubuntu-based VM to host the `phpMyAdmin` interface
-  - Deployed in the same virtual network
-  - Connected privately to the MySQL server
-  - Configured to launch `phpMyAdmin` and expose a browser-based MySQL UI
-
-## phpMyAdmin Demo
-
-[phpMyAdmin](https://www.phpmyadmin.net/) is a popular web-based MySQL administration tool that allows users to interact with MySQL and MariaDB databases through a browser interface. It supports query execution, database browsing, import/export, and user management—all from a secure, private environment.
-
-![phpMyAdmin](phpmyadmin.png)
-
-Query 1:
-```sql
-SELECT
-    -- Select the film title from the 'film' table and label the column 'film_title'
-    f.title AS film_title,
-
-    -- Concatenate the actor's first and last name with a space between them and label the column 'actor_name'
-    CONCAT(a.first_name, ' ', a.last_name) AS actor_name
-
-FROM
-    -- Use the 'film' table as the main source of data (alias 'f')
-    sakila.film f
-
-    -- Join the 'film_actor' link table to associate films with their actors by film_id
-    JOIN sakila.film_actor fa
-        ON f.film_id = fa.film_id
-
-    -- Join the 'actor' table to get actor name details by actor_id
-    JOIN sakila.actor a
-        ON fa.actor_id = a.actor_id
-
--- Sort the results first by film title alphabetically, then by actor name alphabetically within each film
-ORDER BY
-    f.title,
-    actor_name
-
--- Return only the first 20 rows of the result set
-LIMIT 20;                                                   
+./destroy.sh     # destroys the whole stack, including the Key Vault
 ```
 
-Query 2:
+## Notes
 
-```sql
-SELECT
-    -- Select the film title from the 'film' table
-    f.title,
-
-    -- Concatenate all actor full names (first + last name) into a single string
-    -- GROUP_CONCAT builds this list, ordering by actor last name, separating each with a comma and space
-    GROUP_CONCAT(
-        CONCAT(a.first_name, ' ', a.last_name)
-        ORDER BY a.last_name
-        SEPARATOR ', '
-    ) AS actor_names
-
-FROM
-    -- Use the 'film' table as the starting point (aliased as 'f')
-    sakila.film f
-
-    -- Join 'film_actor' to link films to their actors via film_id
-    JOIN sakila.film_actor fa
-        ON f.film_id = fa.film_id
-
-    -- Join 'actor' to get the actual actor names via actor_id
-    JOIN sakila.actor a
-        ON fa.actor_id = a.actor_id
-
--- Group results by film title so each row represents a unique film
-GROUP BY
-    f.title
-
--- Sort the output rows alphabetically by film title
-ORDER BY
-    f.title
-
--- Only return the first 10 rows (the top 10 film titles alphabetically)
-LIMIT 10;
-```
+- **Lab only.** phpMyAdmin is open to the internet over plain HTTP, SSH
+  accepts password logins from anywhere, and the database password is in the
+  VM's custom data. Restrict `vm-nsg` and add TLS for anything more.
